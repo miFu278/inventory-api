@@ -2,8 +2,8 @@ package handler
 
 import (
 	"context"
-	"inventory-api/internal/models"
-	"inventory-api/internal/services"
+	"inventory-api/models"
+	"inventory-api/services"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"

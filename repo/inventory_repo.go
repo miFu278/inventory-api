@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"inventory-api/internal/models"
+	"inventory-api/models"
 
 	"gorm.io/gorm"
 )

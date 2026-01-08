@@ -11,11 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
-	"inventory-api/internal/database"
-	"inventory-api/internal/handler"
-	"inventory-api/internal/models"
-	"inventory-api/internal/repo"
-	"inventory-api/internal/services"
+	"inventory-api/database"
+	"inventory-api/handler"
+	"inventory-api/models"
+	"inventory-api/repo"
+	"inventory-api/services"
 )
 
 func main() {

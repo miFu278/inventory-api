@@ -2,8 +2,8 @@ package services
 
 import (
 	"errors"
-	"inventory-api/internal/models"
-	"inventory-api/internal/repo"
+	"inventory-api/models"
+	"inventory-api/repo"
 
 	"gorm.io/gorm"
 )
