@@ -14,6 +14,8 @@
 # Go workspace file
 go.work
 
+/database/
+
 # Dependency directories
 vendor/
 

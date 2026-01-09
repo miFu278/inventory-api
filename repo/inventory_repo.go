@@ -1,92 +1,149 @@
 package repo
 
 import (
+	"context"
+	"inventory-api/dtos"
 	"inventory-api/models"
 
 	"gorm.io/gorm"
 )
 
 type InventoryRepository struct {
-	db *gorm.DB
+	db              *gorm.DB
+	productRepo     *BaseRepository[models.Product]
+	transactionRepo *BaseRepository[models.Transaction]
 }
 
 func NewInventoryRepository(db *gorm.DB) *InventoryRepository {
-	return &InventoryRepository{db: db}
+	return &InventoryRepository{
+		db:              db,
+		productRepo:     NewBaseRepository[models.Product](db),
+		transactionRepo: NewBaseRepository[models.Transaction](db),
+	}
 }
 
-// Product operations
+// Product operations using BaseRepository
 func (r *InventoryRepository) CreateProduct(product *models.Product) error {
-	return r.db.Create(product).Error
+	return r.productRepo.Create(context.Background(), product)
 }
 
 func (r *InventoryRepository) GetProductByID(id uint) (*models.Product, error) {
-	var product models.Product
-	err := r.db.First(&product, id).Error
-	if err != nil {
-		return nil, err
-	}
-	return &product, nil
+	return r.productRepo.GetByID(context.Background(), id)
 }
 
 func (r *InventoryRepository) GetProductBySKU(sku string) (*models.Product, error) {
-	var product models.Product
-	err := r.db.Where("sku = ?", sku).First(&product).Error
-	if err != nil {
-		return nil, err
-	}
-	return &product, nil
+	return r.productRepo.FindOne(context.Background(), func(db *gorm.DB) *gorm.DB {
+		return db.Where("sku = ?", sku)
+	})
 }
 
 func (r *InventoryRepository) GetAllProducts(limit, offset int) ([]models.Product, error) {
-	var products []models.Product
-	err := r.db.Limit(limit).Offset(offset).Find(&products).Error
-	return products, err
+	return r.productRepo.List(
+		context.Background(),
+		WithLimit(limit),
+		WithOffset(offset),
+	)
+}
+
+// GetProductsWithFilter retrieves products with filtering support
+func (r *InventoryRepository) GetProductsWithFilter(filter *dtos.ProductFilter, limit, offset int) ([]models.Product, error) {
+	scopes := r.buildProductFilterScopes(filter)
+
+	// Add pagination
+	scopes = append(scopes, WithLimit(limit), WithOffset(offset))
+
+	return r.productRepo.List(context.Background(), scopes...)
+}
+
+// buildProductFilterScopes converts ProductFilter to GORM scopes
+func (r *InventoryRepository) buildProductFilterScopes(filter *dtos.ProductFilter) []func(*gorm.DB) *gorm.DB {
+	scopes := []func(*gorm.DB) *gorm.DB{}
+
+	if filter == nil || filter.IsEmpty() {
+		return scopes
+	}
+
+	// Filter by SKU (exact match)
+	if filter.HasSKU() {
+		sku := *filter.SKU
+		scopes = append(scopes, func(db *gorm.DB) *gorm.DB {
+			return db.Where("sku = ?", sku)
+		})
+	}
+
+	// Filter by Name (partial match, case-insensitive)
+	if filter.HasName() {
+		name := *filter.Name
+		scopes = append(scopes, func(db *gorm.DB) *gorm.DB {
+			return db.Where("name ILIKE ?", "%"+name+"%")
+		})
+	}
+
+	// Filter by MinPrice
+	if filter.HasMinPrice() {
+		minPrice := *filter.MinPrice
+		scopes = append(scopes, func(db *gorm.DB) *gorm.DB {
+			return db.Where("price >= ?", minPrice)
+		})
+	}
+
+	// Filter by MaxPrice
+	if filter.HasMaxPrice() {
+		maxPrice := *filter.MaxPrice
+		scopes = append(scopes, func(db *gorm.DB) *gorm.DB {
+			return db.Where("price <= ?", maxPrice)
+		})
+	}
+
+	return scopes
 }
 
 func (r *InventoryRepository) UpdateProduct(product *models.Product) error {
-	return r.db.Save(product).Error
+	return r.productRepo.Update(context.Background(), product)
 }
 
 func (r *InventoryRepository) DeleteProduct(id uint) error {
-	return r.db.Delete(&models.Product{}, id).Error
+	return r.productRepo.Delete(context.Background(), id)
 }
 
-// Transaction operations
+// Transaction operations using BaseRepository
 func (r *InventoryRepository) CreateTransaction(tx *models.Transaction) error {
-	return r.db.Create(tx).Error
+	return r.transactionRepo.Create(context.Background(), tx)
 }
 
 func (r *InventoryRepository) GetTransactionByID(id uint) (*models.Transaction, error) {
-	var transaction models.Transaction
-	err := r.db.Preload("Product").First(&transaction, id).Error
-	if err != nil {
-		return nil, err
-	}
-	return &transaction, nil
+	return r.transactionRepo.FindOne(
+		context.Background(),
+		func(db *gorm.DB) *gorm.DB {
+			return db.Where("id = ?", id)
+		},
+		WithPreload("Product"),
+	)
 }
 
 func (r *InventoryRepository) GetTransactionsByProductID(productID uint, limit, offset int) ([]models.Transaction, error) {
-	var transactions []models.Transaction
-	err := r.db.Where("product_id = ?", productID).
-		Preload("Product").
-		Limit(limit).
-		Offset(offset).
-		Order("created_at DESC").
-		Find(&transactions).Error
-	return transactions, err
+	return r.transactionRepo.List(
+		context.Background(),
+		func(db *gorm.DB) *gorm.DB {
+			return db.Where("product_id = ?", productID)
+		},
+		WithPreload("Product"),
+		WithLimit(limit),
+		WithOffset(offset),
+		WithOrder("created_at DESC"),
+	)
 }
 
 func (r *InventoryRepository) GetAllTransactions(limit, offset int) ([]models.Transaction, error) {
-	var transactions []models.Transaction
-	err := r.db.Preload("Product").
-		Limit(limit).
-		Offset(offset).
-		Order("created_at DESC").
-		Find(&transactions).Error
-	return transactions, err
+	return r.transactionRepo.List(
+		context.Background(),
+		WithPreload("Product"),
+		WithLimit(limit),
+		WithOffset(offset),
+		WithOrder("created_at DESC"),
+	)
 }
 
-// Update product quantity with transaction
 func (r *InventoryRepository) UpdateProductQuantityWithTransaction(productID uint, quantity int, txType models.TransactionType, notes string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Get product

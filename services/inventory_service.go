@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"inventory-api/dtos"
 	"inventory-api/models"
 	"inventory-api/repo"
 
@@ -17,29 +18,25 @@ func NewInventoryService(repo *repo.InventoryRepository) *InventoryService {
 }
 
 // Product services
-func (s *InventoryService) CreateProduct(input *models.CreateProductInput) (*models.Product, error) {
+func (s *InventoryService) CreateProduct(input *dtos.CreateProductInput) (*dtos.ProductResponse, error) {
 	// Check if SKU already exists
 	existing, err := s.repo.GetProductBySKU(input.SKU)
 	if err == nil && existing != nil {
 		return nil, errors.New("product with this SKU already exists")
 	}
 
-	product := &models.Product{
-		Name:        input.Name,
-		SKU:         input.SKU,
-		Description: input.Description,
-		Price:       input.Price,
-		Quantity:    input.Quantity,
-	}
+	// Convert DTO to model
+	product := input.ToProductModel()
 
 	if err := s.repo.CreateProduct(product); err != nil {
 		return nil, err
 	}
 
-	return product, nil
+	// Convert model to response DTO
+	return dtos.ToProductResponse(product), nil
 }
 
-func (s *InventoryService) GetProductByID(id uint) (*models.Product, error) {
+func (s *InventoryService) GetProductByID(id uint) (*dtos.ProductResponse, error) {
 	product, err := s.repo.GetProductByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -47,10 +44,10 @@ func (s *InventoryService) GetProductByID(id uint) (*models.Product, error) {
 		}
 		return nil, err
 	}
-	return product, nil
+	return dtos.ToProductResponse(product), nil
 }
 
-func (s *InventoryService) GetProductBySKU(sku string) (*models.Product, error) {
+func (s *InventoryService) GetProductBySKU(sku string) (*dtos.ProductResponse, error) {
 	product, err := s.repo.GetProductBySKU(sku)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -58,20 +55,43 @@ func (s *InventoryService) GetProductBySKU(sku string) (*models.Product, error) 
 		}
 		return nil, err
 	}
-	return product, nil
+	return dtos.ToProductResponse(product), nil
 }
 
-func (s *InventoryService) GetAllProducts(limit, offset int) ([]models.Product, error) {
+func (s *InventoryService) GetAllProducts(limit, offset int) ([]dtos.ProductResponse, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	return s.repo.GetAllProducts(limit, offset)
+
+	products, err := s.repo.GetAllProducts(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return dtos.ToProductResponseList(products), nil
 }
 
-func (s *InventoryService) UpdateProduct(id uint, input *models.UpdateProductInput) (*models.Product, error) {
+// GetProductsWithFilter retrieves products with filtering
+func (s *InventoryService) GetProductsWithFilter(filter *dtos.ProductFilter, limit, offset int) ([]dtos.ProductResponse, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	products, err := s.repo.GetProductsWithFilter(filter, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return dtos.ToProductResponseList(products), nil
+}
+
+func (s *InventoryService) UpdateProduct(id uint, input *dtos.UpdateProductInput) (*dtos.ProductResponse, error) {
 	product, err := s.repo.GetProductByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -80,22 +100,14 @@ func (s *InventoryService) UpdateProduct(id uint, input *models.UpdateProductInp
 		return nil, err
 	}
 
-	// Update only provided fields
-	if input.Name != nil {
-		product.Name = *input.Name
-	}
-	if input.Description != nil {
-		product.Description = *input.Description
-	}
-	if input.Price != nil {
-		product.Price = *input.Price
-	}
+	// Apply DTO updates to model
+	input.ApplyToProduct(product)
 
 	if err := s.repo.UpdateProduct(product); err != nil {
 		return nil, err
 	}
 
-	return product, nil
+	return dtos.ToProductResponse(product), nil
 }
 
 func (s *InventoryService) DeleteProduct(id uint) error {
@@ -112,7 +124,7 @@ func (s *InventoryService) DeleteProduct(id uint) error {
 }
 
 // Transaction services
-func (s *InventoryService) CreateTransaction(input *models.CreateTransactionInput) (*models.Transaction, error) {
+func (s *InventoryService) CreateTransaction(input *dtos.CreateTransactionInput) (*dtos.TransactionResponse, error) {
 	// Validate product exists
 	_, err := s.repo.GetProductByID(input.ProductID)
 	if err != nil {
@@ -131,7 +143,7 @@ func (s *InventoryService) CreateTransaction(input *models.CreateTransactionInpu
 	err = s.repo.UpdateProductQuantityWithTransaction(
 		input.ProductID,
 		input.Quantity,
-		input.TransactionType,
+		models.TransactionType(input.TransactionType),
 		input.Notes,
 	)
 	if err != nil {
@@ -147,10 +159,10 @@ func (s *InventoryService) CreateTransaction(input *models.CreateTransactionInpu
 		return nil, errors.New("failed to retrieve created transaction")
 	}
 
-	return &transactions[0], nil
+	return dtos.ToTransactionResponse(&transactions[0]), nil
 }
 
-func (s *InventoryService) GetTransactionByID(id uint) (*models.Transaction, error) {
+func (s *InventoryService) GetTransactionByID(id uint) (*dtos.TransactionResponse, error) {
 	transaction, err := s.repo.GetTransactionByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -158,10 +170,10 @@ func (s *InventoryService) GetTransactionByID(id uint) (*models.Transaction, err
 		}
 		return nil, err
 	}
-	return transaction, nil
+	return dtos.ToTransactionResponse(transaction), nil
 }
 
-func (s *InventoryService) GetTransactionsByProductID(productID uint, limit, offset int) ([]models.Transaction, error) {
+func (s *InventoryService) GetTransactionsByProductID(productID uint, limit, offset int) ([]dtos.TransactionResponse, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -178,15 +190,26 @@ func (s *InventoryService) GetTransactionsByProductID(productID uint, limit, off
 		return nil, err
 	}
 
-	return s.repo.GetTransactionsByProductID(productID, limit, offset)
+	transactions, err := s.repo.GetTransactionsByProductID(productID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return dtos.ToTransactionResponseList(transactions), nil
 }
 
-func (s *InventoryService) GetAllTransactions(limit, offset int) ([]models.Transaction, error) {
+func (s *InventoryService) GetAllTransactions(limit, offset int) ([]dtos.TransactionResponse, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	return s.repo.GetAllTransactions(limit, offset)
+
+	transactions, err := s.repo.GetAllTransactions(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return dtos.ToTransactionResponseList(transactions), nil
 }

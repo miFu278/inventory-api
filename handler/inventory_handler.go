@@ -2,7 +2,7 @@ package handler
 
 import (
 	"context"
-	"inventory-api/models"
+	"inventory-api/dtos"
 	"inventory-api/services"
 	"net/http"
 
@@ -15,52 +15,6 @@ type InventoryHandler struct {
 
 func NewInventoryHandler(service *services.InventoryService) *InventoryHandler {
 	return &InventoryHandler{service: service}
-}
-
-type ProductResponse struct {
-	Body *models.Product
-}
-
-type ProductListResponse struct {
-	Body struct {
-		Products []models.Product `json:"products"`
-		Limit    int              `json:"limit"`
-		Offset   int              `json:"offset"`
-	}
-}
-
-type TransactionResponse struct {
-	Body *models.Transaction
-}
-
-type TransactionListResponse struct {
-	Body struct {
-		Transactions []models.Transaction `json:"transactions"`
-		Limit        int                  `json:"limit"`
-		Offset       int                  `json:"offset"`
-	}
-}
-
-type CreateProductRequest struct {
-	Body models.CreateProductInput
-}
-
-type UpdateProductRequest struct {
-	ID   uint `path:"id"`
-	Body models.UpdateProductInput
-}
-
-type CreateTransactionRequest struct {
-	Body models.CreateTransactionInput
-}
-
-type IDParam struct {
-	ID uint `path:"id"`
-}
-
-type PaginationQuery struct {
-	Limit  int `query:"limit" default:"10" minimum:"1" maximum:"100"`
-	Offset int `query:"offset" default:"0" minimum:"0"`
 }
 
 func (h *InventoryHandler) RegisterRoutes(api huma.API) {
@@ -137,87 +91,88 @@ func (h *InventoryHandler) RegisterRoutes(api huma.API) {
 	}, h.ListProductTransactions)
 }
 
-func (h *InventoryHandler) CreateProduct(ctx context.Context, input *CreateProductRequest) (*ProductResponse, error) {
+func (h *InventoryHandler) CreateProduct(ctx context.Context, input *dtos.CreateProductRequest) (*dtos.SingleProductResponse, error) {
 	product, err := h.service.CreateProduct(&input.Body)
 	if err != nil {
 		return nil, huma.Error400BadRequest(err.Error())
 	}
-	return &ProductResponse{Body: product}, nil
+	return &dtos.SingleProductResponse{Body: product}, nil
 }
 
-func (h *InventoryHandler) GetProduct(ctx context.Context, input *IDParam) (*ProductResponse, error) {
+func (h *InventoryHandler) GetProduct(ctx context.Context, input *dtos.IDParam) (*dtos.SingleProductResponse, error) {
 	product, err := h.service.GetProductByID(input.ID)
 	if err != nil {
 		return nil, huma.Error404NotFound(err.Error())
 	}
-	return &ProductResponse{Body: product}, nil
+	return &dtos.SingleProductResponse{Body: product}, nil
 }
 
-func (h *InventoryHandler) ListProducts(ctx context.Context, input *PaginationQuery) (*ProductListResponse, error) {
-	products, err := h.service.GetAllProducts(input.Limit, input.Offset)
+func (h *InventoryHandler) ListProducts(ctx context.Context, input *dtos.ProductListQuery) (*dtos.ProductListResponse, error) {
+	// Convert query to filter
+	filter := input.ToProductFilter()
+
+	products, err := h.service.GetProductsWithFilter(filter, input.Limit, input.Offset)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	resp := &ProductListResponse{}
+
+	resp := &dtos.ProductListResponse{}
 	resp.Body.Products = products
 	resp.Body.Limit = input.Limit
 	resp.Body.Offset = input.Offset
 	return resp, nil
 }
 
-func (h *InventoryHandler) UpdateProduct(ctx context.Context, input *UpdateProductRequest) (*ProductResponse, error) {
+func (h *InventoryHandler) UpdateProduct(ctx context.Context, input *dtos.UpdateProductRequest) (*dtos.SingleProductResponse, error) {
 	product, err := h.service.UpdateProduct(input.ID, &input.Body)
 	if err != nil {
 		return nil, huma.Error400BadRequest(err.Error())
 	}
-	return &ProductResponse{Body: product}, nil
+	return &dtos.SingleProductResponse{Body: product}, nil
 }
 
-func (h *InventoryHandler) DeleteProduct(ctx context.Context, input *IDParam) (*struct{}, error) {
+func (h *InventoryHandler) DeleteProduct(ctx context.Context, input *dtos.IDParam) (*dtos.EmptyResponse, error) {
 	err := h.service.DeleteProduct(input.ID)
 	if err != nil {
 		return nil, huma.Error404NotFound(err.Error())
 	}
-	return &struct{}{}, nil
+	return &dtos.EmptyResponse{}, nil
 }
 
-func (h *InventoryHandler) CreateTransaction(ctx context.Context, input *CreateTransactionRequest) (*TransactionResponse, error) {
+func (h *InventoryHandler) CreateTransaction(ctx context.Context, input *dtos.CreateTransactionRequest) (*dtos.SingleTransactionResponse, error) {
 	transaction, err := h.service.CreateTransaction(&input.Body)
 	if err != nil {
 		return nil, huma.Error400BadRequest(err.Error())
 	}
-	return &TransactionResponse{Body: transaction}, nil
+	return &dtos.SingleTransactionResponse{Body: transaction}, nil
 }
 
-func (h *InventoryHandler) GetTransaction(ctx context.Context, input *IDParam) (*TransactionResponse, error) {
+func (h *InventoryHandler) GetTransaction(ctx context.Context, input *dtos.IDParam) (*dtos.SingleTransactionResponse, error) {
 	transaction, err := h.service.GetTransactionByID(input.ID)
 	if err != nil {
 		return nil, huma.Error404NotFound(err.Error())
 	}
-	return &TransactionResponse{Body: transaction}, nil
+	return &dtos.SingleTransactionResponse{Body: transaction}, nil
 }
 
-func (h *InventoryHandler) ListTransactions(ctx context.Context, input *PaginationQuery) (*TransactionListResponse, error) {
+func (h *InventoryHandler) ListTransactions(ctx context.Context, input *dtos.PaginationQuery) (*dtos.TransactionListResponse, error) {
 	transactions, err := h.service.GetAllTransactions(input.Limit, input.Offset)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	resp := &TransactionListResponse{}
+	resp := &dtos.TransactionListResponse{}
 	resp.Body.Transactions = transactions
 	resp.Body.Limit = input.Limit
 	resp.Body.Offset = input.Offset
 	return resp, nil
 }
 
-func (h *InventoryHandler) ListProductTransactions(ctx context.Context, input *struct {
-	IDParam
-	PaginationQuery
-}) (*TransactionListResponse, error) {
+func (h *InventoryHandler) ListProductTransactions(ctx context.Context, input *dtos.ProductTransactionsQuery) (*dtos.TransactionListResponse, error) {
 	transactions, err := h.service.GetTransactionsByProductID(input.ID, input.Limit, input.Offset)
 	if err != nil {
 		return nil, huma.Error404NotFound(err.Error())
 	}
-	resp := &TransactionListResponse{}
+	resp := &dtos.TransactionListResponse{}
 	resp.Body.Transactions = transactions
 	resp.Body.Limit = input.Limit
 	resp.Body.Offset = input.Offset
