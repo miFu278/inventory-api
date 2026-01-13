@@ -82,3 +82,36 @@ func (f *ProductFilter) HasMinPrice() bool {
 func (f *ProductFilter) HasMaxPrice() bool {
 	return f != nil && f.MaxPrice != nil
 }
+
+// User DTOs
+type RegisterInput struct {
+	Username string `json:"username" minLength:"3" maxLength:"50" doc:"Username"`
+	Password string `json:"password" minLength:"6" doc:"Password (minimum 6 characters)"`
+	Email    string `json:"email" format:"email" doc:"Email address"`
+	Phone    string `json:"phone" minLength:"10" maxLength:"15" doc:"Phone number"`
+	Role     string `json:"role" enum:"admin,user" default:"user" doc:"User role (admin/user)"`
+}
+
+type LoginInput struct {
+	Username string `json:"username" minLength:"1" doc:"Username"`
+	Password string `json:"password" minLength:"1" doc:"Password"`
+}
+
+type UpdateUserInput struct {
+	Email *string `json:"email,omitempty" format:"email" doc:"Email address"`
+	Phone *string `json:"phone,omitempty" minLength:"10" maxLength:"15" doc:"Phone number"`
+	Role  *string `json:"role,omitempty" enum:"admin,user" doc:"User role (admin/user)"`
+}
+
+type ChangePasswordInput struct {
+	OldPassword string `json:"old_password" minLength:"1" doc:"Current password"`
+	NewPassword string `json:"new_password" minLength:"6" doc:"New password (minimum 6 characters)"`
+}
+
+type UserResponse struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Role     string `json:"role"`
+}

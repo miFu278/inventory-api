@@ -55,3 +55,21 @@ type ProductTransactionsQuery struct {
 	IDParam
 	PaginationQuery
 }
+
+// User requests
+type RegisterRequest struct {
+	Body RegisterInput
+}
+
+type LoginRequest struct {
+	Body LoginInput
+}
+
+type UpdateUserRequest struct {
+	ID   uint `path:"id"`
+	Body UpdateUserInput
+}
+
+type ChangePasswordRequest struct {
+	Body ChangePasswordInput
+}

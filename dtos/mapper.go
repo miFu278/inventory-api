@@ -96,3 +96,26 @@ func ToTransactionResponseList(transactions []models.Transaction) []TransactionR
 	}
 	return responses
 }
+
+// ToUserResponse converts User model to UserResponse DTO
+func ToUserResponse(user *models.User) *UserResponse {
+	if user == nil {
+		return nil
+	}
+	return &UserResponse{
+		ID:       user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		Phone:    user.Phone,
+		Role:     user.Role,
+	}
+}
+
+// ToUserResponseList converts slice of User models to slice of UserResponse DTOs
+func ToUserResponseList(users []models.User) []UserResponse {
+	responses := make([]UserResponse, len(users))
+	for i, user := range users {
+		responses[i] = *ToUserResponse(&user)
+	}
+	return responses
+}

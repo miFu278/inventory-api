@@ -25,3 +25,23 @@ type TransactionListResponse struct {
 }
 
 type EmptyResponse struct{}
+
+// User responses
+type LoginResponse struct {
+	Body struct {
+		Token string        `json:"token"`
+		User  *UserResponse `json:"user"`
+	}
+}
+
+type SingleUserResponse struct {
+	Body *UserResponse
+}
+
+type UserListResponse struct {
+	Body struct {
+		Users  []UserResponse `json:"users"`
+		Limit  int            `json:"limit"`
+		Offset int            `json:"offset"`
+	}
+}

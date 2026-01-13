@@ -4,25 +4,24 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 
+	"inventory-api/config"
 	"inventory-api/database"
 	"inventory-api/handler"
+	"inventory-api/middleware"
 	"inventory-api/models"
 	"inventory-api/repo"
 	"inventory-api/services"
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using environment variables")
-	}
+	// Load configuration
+	cfg := config.Load()
 
 	// Connect to database
 	if err := database.ConnectPostgres(); err != nil {
@@ -32,32 +31,72 @@ func main() {
 
 	// Auto migrate models
 	db := database.GetDB()
-	if err := db.AutoMigrate(&models.Product{}, &models.Transaction{}); err != nil {
+	if err := db.AutoMigrate(&models.Product{}, &models.Transaction{}, &models.User{}); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
 	log.Println("Database migration completed")
 
-	// Initialize layers
+	// Initialize repositories
 	inventoryRepo := repo.NewInventoryRepository(db)
+	userRepo := repo.NewUserRepository(db)
+
+	// Initialize services
 	inventoryService := services.NewInventoryService(inventoryRepo)
+	userService := services.NewUserService(userRepo, cfg.JWTSecret)
+
+	// Initialize handlers
 	inventoryHandler := handler.NewInventoryHandler(inventoryService)
+	userHandler := handler.NewUserHandler(userService)
 
 	// Setup Gin router
 	router := gin.Default()
 
 	// Setup Huma API
-	config := huma.DefaultConfig("Inventory API", "1.0.0")
-	config.Info.Description = "REST API for inventory management system"
-	api := humagin.New(router, config)
+	humaConfig := huma.DefaultConfig("Inventory API", "1.0.0")
+	humaConfig.Info.Description = "REST API for inventory management system with JWT authentication"
+
+	// Add security scheme for JWT
+	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+		"bearerAuth": {
+			Type:         "http",
+			Scheme:       "bearer",
+			BearerFormat: "JWT",
+			Description:  "Enter your JWT token",
+		},
+	}
+
+	api := humagin.New(router, humaConfig)
+
+	// Add JWT middleware to protected routes
+	api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
+		path := ctx.URL().Path
+
+		// Skip auth for public endpoints
+		if strings.HasPrefix(path, "/auth/") ||
+			strings.HasPrefix(path, "/docs") ||
+			strings.HasPrefix(path, "/schemas") ||
+			strings.HasPrefix(path, "/openapi") ||
+			strings.HasPrefix(path, "/products") ||
+			strings.HasPrefix(path, "/transactions") {
+			next(ctx)
+			return
+		}
+
+		// Apply auth middleware for /users routes
+		if strings.HasPrefix(path, "/users") {
+			middleware.HumaAuthMiddleware(api, cfg.JWTSecret)(ctx, next)
+			return
+		}
+
+		next(ctx)
+	})
 
 	// Register routes
 	inventoryHandler.RegisterRoutes(api)
+	userHandler.RegisterRoutes(api)
 
 	// Get server port
-	port := os.Getenv("SERVER_PORT")
-	if port == "" {
-		port = "8080"
-	}
+	port := cfg.ServerPort
 
 	// Start server
 	addr := fmt.Sprintf(":%s", port)

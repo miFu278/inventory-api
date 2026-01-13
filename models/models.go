@@ -35,3 +35,12 @@ type Transaction struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
+
+type User struct {
+	ID             uint   `gorm:"primaryKey"`
+	Username       string `gorm:"not null;unique"`
+	PasswordHashed string `gorm:"not null"`
+	Email          string `gorm:"not null;unique"`
+	Role           string `gorm:"not null"`
+	Phone          string `gorm:"not null"`
+}

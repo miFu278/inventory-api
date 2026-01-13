@@ -8,6 +8,13 @@
 # Test binary, built with `go test -c`
 *.test
 
+# Test files (temporary ignore)
+*_test.go
+coverage.out
+coverage.html
+
+*.kiro
+
 # Output of the go coverage tool
 *.out
 

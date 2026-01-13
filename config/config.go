@@ -14,6 +14,7 @@ type Config struct {
 	DBPassword string
 	DBName     string
 	ServerPort string
+	JWTSecret  string
 }
 
 func Load() *Config {
@@ -28,6 +29,7 @@ func Load() *Config {
 		DBPassword: getEnv("DB_PASSWORD", "postgres"),
 		DBName:     getEnv("DB_NAME", "inventory_db"),
 		ServerPort: getEnv("SERVER_PORT", "8080"),
+		JWTSecret:  getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 	}
 }
 

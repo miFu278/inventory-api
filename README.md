@@ -35,6 +35,7 @@ DB_USER=postgres
 DB_PASSWORD=your_password_here
 DB_NAME=inventory_db
 SERVER_PORT=8080
+JWT_SECRET=your-secret-key-change-in-production
 ```
 
 ## Chạy ứng dụng
@@ -100,6 +101,20 @@ Sau khi chạy ứng dụng, truy cập:
 
 ## API Endpoints
 
+### Authentication
+
+- `POST /auth/register` - Đăng ký user mới
+- `POST /auth/login` - Đăng nhập và nhận JWT token
+
+### Users (Protected - Requires JWT)
+
+- `GET /users/profile` - Xem profile của user hiện tại
+- `POST /users/change-password` - Đổi mật khẩu
+- `GET /users` - Lấy danh sách users (admin only)
+- `GET /users/{id}` - Lấy thông tin user theo ID (admin only)
+- `PUT /users/{id}` - Cập nhật user (admin only)
+- `DELETE /users/{id}` - Xóa user (admin only)
+
 ### Products
 
 - `POST /products` - Tạo sản phẩm mới
@@ -116,6 +131,52 @@ Sau khi chạy ứng dụng, truy cập:
 - `GET /products/{id}/transactions` - Lấy lịch sử giao dịch của sản phẩm
 
 ## Ví dụ sử dụng
+
+### Đăng ký user mới
+
+```bash
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_doe",
+    "password": "password123",
+    "email": "john@example.com",
+    "phone": "0123456789",
+    "role": "user"
+  }'
+```
+
+### Đăng nhập
+
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_doe",
+    "password": "password123"
+  }'
+```
+
+Response sẽ trả về token:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "john_doe",
+    "email": "john@example.com",
+    "phone": "0123456789",
+    "role": "user"
+  }
+}
+```
+
+### Xem profile (với JWT token)
+
+```bash
+curl -X GET http://localhost:8080/users/profile \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
 
 ### Tạo sản phẩm mới
 
@@ -192,6 +253,9 @@ inventory-api/
 ## Features
 
 - ✅ RESTful API với Huma framework
+- ✅ JWT Authentication với Bearer token
+- ✅ Password hashing với bcrypt
+- ✅ Role-based access control (admin/user)
 - ✅ Auto-generated OpenAPI documentation
 - ✅ Input validation tự động
 - ✅ Soft delete cho products
@@ -199,6 +263,7 @@ inventory-api/
 - ✅ Pagination support
 - ✅ Docker support
 - ✅ GORM ORM với PostgreSQL
+- ✅ Clean Architecture (handler → service → repo)
 
 ## Troubleshooting
 
