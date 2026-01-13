@@ -75,15 +75,24 @@ func main() {
 		if strings.HasPrefix(path, "/auth/") ||
 			strings.HasPrefix(path, "/docs") ||
 			strings.HasPrefix(path, "/schemas") ||
-			strings.HasPrefix(path, "/openapi") ||
-			strings.HasPrefix(path, "/products") ||
-			strings.HasPrefix(path, "/transactions") {
+			strings.HasPrefix(path, "/openapi") {
 			next(ctx)
 			return
 		}
 
-		// Apply auth middleware for /users routes
-		if strings.HasPrefix(path, "/users") {
+		// Apply auth middleware for protected routes
+		if strings.HasPrefix(path, "/users") ||
+			strings.HasPrefix(path, "/products") ||
+			strings.HasPrefix(path, "/transactions") {
+
+			// Allow public read access to products list and details
+			if (path == "/products" || strings.HasPrefix(path, "/products/")) &&
+				ctx.Method() == http.MethodGet &&
+				!strings.Contains(path, "/transactions") {
+				next(ctx)
+				return
+			}
+
 			middleware.HumaAuthMiddleware(api, cfg.JWTSecret)(ctx, next)
 			return
 		}

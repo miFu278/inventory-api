@@ -172,6 +172,11 @@ func (h *UserHandler) ChangePassword(ctx context.Context, input *dtos.ChangePass
 }
 
 func (h *UserHandler) GetAllUsers(ctx context.Context, input *dtos.PaginationQuery) (*dtos.UserListResponse, error) {
+	// Check if user is admin
+	if !middleware.IsAdmin(ctx) {
+		return nil, huma.Error403Forbidden("Only admins can list all users")
+	}
+
 	users, err := h.userService.GetAllUsers(input.Limit, input.Offset)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
@@ -185,6 +190,11 @@ func (h *UserHandler) GetAllUsers(ctx context.Context, input *dtos.PaginationQue
 }
 
 func (h *UserHandler) GetUserByID(ctx context.Context, input *dtos.IDParam) (*dtos.SingleUserResponse, error) {
+	// Check if user is admin or accessing their own profile
+	if !middleware.IsOwnerOrAdmin(ctx, input.ID) {
+		return nil, huma.Error403Forbidden("Access denied")
+	}
+
 	user, err := h.userService.GetUserByID(input.ID)
 	if err != nil {
 		return nil, huma.Error404NotFound("User not found")
@@ -194,6 +204,24 @@ func (h *UserHandler) GetUserByID(ctx context.Context, input *dtos.IDParam) (*dt
 }
 
 func (h *UserHandler) UpdateUser(ctx context.Context, input *dtos.UpdateUserRequest) (*dtos.SingleUserResponse, error) {
+	auth := middleware.GetAuthContext(ctx)
+	if auth == nil {
+		return nil, huma.Error401Unauthorized("Authentication required")
+	}
+
+	// Check permissions
+	isOwner := auth.UserID == input.ID
+	isAdmin := middleware.IsAdmin(ctx)
+
+	if !isOwner && !isAdmin {
+		return nil, huma.Error403Forbidden("Access denied")
+	}
+
+	// Only admins can change roles
+	if input.Body.Role != nil && !isAdmin {
+		return nil, huma.Error403Forbidden("Only admins can change user roles")
+	}
+
 	email := ""
 	phone := ""
 	role := ""
@@ -216,6 +244,17 @@ func (h *UserHandler) UpdateUser(ctx context.Context, input *dtos.UpdateUserRequ
 }
 
 func (h *UserHandler) DeleteUser(ctx context.Context, input *dtos.IDParam) (*dtos.EmptyResponse, error) {
+	// Only admins can delete users
+	if !middleware.IsAdmin(ctx) {
+		return nil, huma.Error403Forbidden("Only admins can delete users")
+	}
+
+	auth := middleware.GetAuthContext(ctx)
+	// Prevent self-deletion
+	if auth != nil && auth.UserID == input.ID {
+		return nil, huma.Error400BadRequest("Cannot delete your own account")
+	}
+
 	err := h.userService.DeleteUser(input.ID)
 	if err != nil {
 		return nil, huma.Error400BadRequest(err.Error())

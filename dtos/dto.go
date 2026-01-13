@@ -85,10 +85,10 @@ func (f *ProductFilter) HasMaxPrice() bool {
 
 // User DTOs
 type RegisterInput struct {
-	Username string `json:"username" minLength:"3" maxLength:"50" doc:"Username"`
-	Password string `json:"password" minLength:"6" doc:"Password (minimum 6 characters)"`
+	Username string `json:"username" minLength:"3" maxLength:"50" pattern:"^[a-zA-Z0-9_]+$" doc:"Username (alphanumeric and underscore only)"`
+	Password string `json:"password" minLength:"8" maxLength:"100" doc:"Password (minimum 8 characters)"`
 	Email    string `json:"email" format:"email" doc:"Email address"`
-	Phone    string `json:"phone" minLength:"10" maxLength:"15" doc:"Phone number"`
+	Phone    string `json:"phone" minLength:"10" maxLength:"15" pattern:"^[0-9+\\-\\s()]+$" doc:"Phone number"`
 	Role     string `json:"role" enum:"admin,user" default:"user" doc:"User role (admin/user)"`
 }
 
@@ -105,7 +105,7 @@ type UpdateUserInput struct {
 
 type ChangePasswordInput struct {
 	OldPassword string `json:"old_password" minLength:"1" doc:"Current password"`
-	NewPassword string `json:"new_password" minLength:"6" doc:"New password (minimum 6 characters)"`
+	NewPassword string `json:"new_password" minLength:"8" maxLength:"100" doc:"New password (minimum 8 characters)"`
 }
 
 type UserResponse struct {

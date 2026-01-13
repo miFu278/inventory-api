@@ -101,29 +101,29 @@ Sau khi chạy ứng dụng, truy cập:
 
 ## API Endpoints
 
-### Authentication
+### Authentication (Public)
 
 - `POST /auth/register` - Đăng ký user mới
 - `POST /auth/login` - Đăng nhập và nhận JWT token
 
 ### Users (Protected - Requires JWT)
 
-- `GET /users/profile` - Xem profile của user hiện tại
-- `POST /users/change-password` - Đổi mật khẩu
+- `GET /users/profile` - Xem profile của user hiện tại (any authenticated user)
+- `POST /users/change-password` - Đổi mật khẩu (any authenticated user)
 - `GET /users` - Lấy danh sách users (admin only)
-- `GET /users/{id}` - Lấy thông tin user theo ID (admin only)
-- `PUT /users/{id}` - Cập nhật user (admin only)
-- `DELETE /users/{id}` - Xóa user (admin only)
+- `GET /users/{id}` - Lấy thông tin user theo ID (admin or owner)
+- `PUT /users/{id}` - Cập nhật user (admin or owner, only admin can change roles)
+- `DELETE /users/{id}` - Xóa user (admin only, cannot delete self)
 
 ### Products
 
-- `POST /products` - Tạo sản phẩm mới
-- `GET /products` - Lấy danh sách sản phẩm (có phân trang)
-- `GET /products/{id}` - Lấy thông tin sản phẩm theo ID
-- `PUT /products/{id}` - Cập nhật sản phẩm
-- `DELETE /products/{id}` - Xóa sản phẩm (soft delete)
+- `GET /products` - Lấy danh sách sản phẩm (public)
+- `GET /products/{id}` - Lấy thông tin sản phẩm theo ID (public)
+- `POST /products` - Tạo sản phẩm mới (authenticated users)
+- `PUT /products/{id}` - Cập nhật sản phẩm (authenticated users)
+- `DELETE /products/{id}` - Xóa sản phẩm (admin only)
 
-### Transactions
+### Transactions (Protected - Requires JWT)
 
 - `POST /transactions` - Tạo giao dịch nhập/xuất kho
 - `GET /transactions` - Lấy danh sách giao dịch (có phân trang)
@@ -145,6 +145,10 @@ curl -X POST http://localhost:8080/auth/register \
     "role": "user"
   }'
 ```
+
+**Password Requirements:**
+- Minimum 8 characters
+- Username: 3-50 characters, alphanumeric and underscore only
 
 ### Đăng nhập
 
@@ -211,7 +215,14 @@ curl -X POST http://localhost:8080/transactions \
 curl "http://localhost:8080/products?limit=10&offset=0"
 ```
 
-## Validation Rules
+### Validation Rules
+
+### Register User
+- `username`: 3-50 ký tự, chỉ chữ cái, số và underscore
+- `password`: tối thiểu 8 ký tự
+- `email`: định dạng email hợp lệ
+- `phone`: 10-15 ký tự, chỉ số và ký tự đặc biệt (+, -, space, ())
+- `role`: chỉ nhận "admin" hoặc "user"
 
 ### Create Product
 - `name`: bắt buộc, 1-255 ký tự
@@ -228,6 +239,10 @@ curl "http://localhost:8080/products?limit=10&offset=0"
 - `product_id`: bắt buộc
 - `quantity`: bắt buộc, phải >= 1
 - `transaction_type`: bắt buộc, chỉ nhận "IN" hoặc "OUT"
+
+### Change Password
+- `old_password`: bắt buộc
+- `new_password`: tối thiểu 8 ký tự, phải khác mật khẩu cũ
 
 ## Cấu trúc thư mục
 
@@ -254,16 +269,32 @@ inventory-api/
 
 - ✅ RESTful API với Huma framework
 - ✅ JWT Authentication với Bearer token
-- ✅ Password hashing với bcrypt
 - ✅ Role-based access control (admin/user)
+- ✅ Owner-based authorization
+- ✅ Password hashing với bcrypt (minimum 8 characters)
+- ✅ Secure error messages (no information leakage)
+- ✅ Input validation với pattern matching
 - ✅ Auto-generated OpenAPI documentation
-- ✅ Input validation tự động
 - ✅ Soft delete cho products
 - ✅ Transaction tracking (IN/OUT)
 - ✅ Pagination support
 - ✅ Docker support
 - ✅ GORM ORM với PostgreSQL
 - ✅ Clean Architecture (handler → service → repo)
+
+## Security
+
+Xem chi tiết về bảo mật tại [docs/SECURITY.md](docs/SECURITY.md)
+
+### Quick Security Notes
+
+- JWT tokens expire sau 24 giờ
+- Passwords được hash với bcrypt
+- Role-based access control (RBAC)
+- Admin không thể tự xóa account của mình
+- Users chỉ có thể update profile của mình (trừ role)
+- Generic error messages để tránh user enumeration
+- Products list/detail là public, các operations khác cần authentication
 
 ## Troubleshooting
 

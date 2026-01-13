@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"inventory-api/dtos"
+	"inventory-api/middleware"
 	"inventory-api/services"
 	"net/http"
 
@@ -18,12 +19,16 @@ func NewInventoryHandler(service *services.InventoryService) *InventoryHandler {
 }
 
 func (h *InventoryHandler) RegisterRoutes(api huma.API) {
+	// Product routes - require authentication
 	huma.Register(api, huma.Operation{
 		OperationID: "create-product",
 		Method:      http.MethodPost,
 		Path:        "/products",
 		Summary:     "Create a new product",
 		Tags:        []string{"Products"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
 	}, h.CreateProduct)
 
 	huma.Register(api, huma.Operation{
@@ -48,6 +53,9 @@ func (h *InventoryHandler) RegisterRoutes(api huma.API) {
 		Path:        "/products/{id}",
 		Summary:     "Update product",
 		Tags:        []string{"Products"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
 	}, h.UpdateProduct)
 
 	huma.Register(api, huma.Operation{
@@ -56,14 +64,21 @@ func (h *InventoryHandler) RegisterRoutes(api huma.API) {
 		Path:        "/products/{id}",
 		Summary:     "Delete product",
 		Tags:        []string{"Products"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
 	}, h.DeleteProduct)
 
+	// Transaction routes - require authentication
 	huma.Register(api, huma.Operation{
 		OperationID: "create-transaction",
 		Method:      http.MethodPost,
 		Path:        "/transactions",
 		Summary:     "Create a new transaction",
 		Tags:        []string{"Transactions"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
 	}, h.CreateTransaction)
 
 	huma.Register(api, huma.Operation{
@@ -72,6 +87,9 @@ func (h *InventoryHandler) RegisterRoutes(api huma.API) {
 		Path:        "/transactions/{id}",
 		Summary:     "Get transaction by ID",
 		Tags:        []string{"Transactions"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
 	}, h.GetTransaction)
 
 	huma.Register(api, huma.Operation{
@@ -80,6 +98,9 @@ func (h *InventoryHandler) RegisterRoutes(api huma.API) {
 		Path:        "/transactions",
 		Summary:     "List all transactions",
 		Tags:        []string{"Transactions"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
 	}, h.ListTransactions)
 
 	huma.Register(api, huma.Operation{
@@ -88,10 +109,19 @@ func (h *InventoryHandler) RegisterRoutes(api huma.API) {
 		Path:        "/products/{id}/transactions",
 		Summary:     "List transactions for a product",
 		Tags:        []string{"Transactions"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
 	}, h.ListProductTransactions)
 }
 
 func (h *InventoryHandler) CreateProduct(ctx context.Context, input *dtos.CreateProductRequest) (*dtos.SingleProductResponse, error) {
+	// Verify authentication
+	auth := middleware.GetAuthContext(ctx)
+	if auth == nil {
+		return nil, huma.Error401Unauthorized("Authentication required")
+	}
+
 	product, err := h.service.CreateProduct(&input.Body)
 	if err != nil {
 		return nil, huma.Error400BadRequest(err.Error())
@@ -124,6 +154,12 @@ func (h *InventoryHandler) ListProducts(ctx context.Context, input *dtos.Product
 }
 
 func (h *InventoryHandler) UpdateProduct(ctx context.Context, input *dtos.UpdateProductRequest) (*dtos.SingleProductResponse, error) {
+	// Verify authentication
+	auth := middleware.GetAuthContext(ctx)
+	if auth == nil {
+		return nil, huma.Error401Unauthorized("Authentication required")
+	}
+
 	product, err := h.service.UpdateProduct(input.ID, &input.Body)
 	if err != nil {
 		return nil, huma.Error400BadRequest(err.Error())
@@ -132,6 +168,11 @@ func (h *InventoryHandler) UpdateProduct(ctx context.Context, input *dtos.Update
 }
 
 func (h *InventoryHandler) DeleteProduct(ctx context.Context, input *dtos.IDParam) (*dtos.EmptyResponse, error) {
+	// Only admins can delete products
+	if !middleware.IsAdmin(ctx) {
+		return nil, huma.Error403Forbidden("Only admins can delete products")
+	}
+
 	err := h.service.DeleteProduct(input.ID)
 	if err != nil {
 		return nil, huma.Error404NotFound(err.Error())
@@ -140,6 +181,12 @@ func (h *InventoryHandler) DeleteProduct(ctx context.Context, input *dtos.IDPara
 }
 
 func (h *InventoryHandler) CreateTransaction(ctx context.Context, input *dtos.CreateTransactionRequest) (*dtos.SingleTransactionResponse, error) {
+	// Verify authentication
+	auth := middleware.GetAuthContext(ctx)
+	if auth == nil {
+		return nil, huma.Error401Unauthorized("Authentication required")
+	}
+
 	transaction, err := h.service.CreateTransaction(&input.Body)
 	if err != nil {
 		return nil, huma.Error400BadRequest(err.Error())
@@ -148,6 +195,12 @@ func (h *InventoryHandler) CreateTransaction(ctx context.Context, input *dtos.Cr
 }
 
 func (h *InventoryHandler) GetTransaction(ctx context.Context, input *dtos.IDParam) (*dtos.SingleTransactionResponse, error) {
+	// Verify authentication
+	auth := middleware.GetAuthContext(ctx)
+	if auth == nil {
+		return nil, huma.Error401Unauthorized("Authentication required")
+	}
+
 	transaction, err := h.service.GetTransactionByID(input.ID)
 	if err != nil {
 		return nil, huma.Error404NotFound(err.Error())
@@ -156,6 +209,12 @@ func (h *InventoryHandler) GetTransaction(ctx context.Context, input *dtos.IDPar
 }
 
 func (h *InventoryHandler) ListTransactions(ctx context.Context, input *dtos.PaginationQuery) (*dtos.TransactionListResponse, error) {
+	// Verify authentication
+	auth := middleware.GetAuthContext(ctx)
+	if auth == nil {
+		return nil, huma.Error401Unauthorized("Authentication required")
+	}
+
 	transactions, err := h.service.GetAllTransactions(input.Limit, input.Offset)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
@@ -168,6 +227,12 @@ func (h *InventoryHandler) ListTransactions(ctx context.Context, input *dtos.Pag
 }
 
 func (h *InventoryHandler) ListProductTransactions(ctx context.Context, input *dtos.ProductTransactionsQuery) (*dtos.TransactionListResponse, error) {
+	// Verify authentication
+	auth := middleware.GetAuthContext(ctx)
+	if auth == nil {
+		return nil, huma.Error401Unauthorized("Authentication required")
+	}
+
 	transactions, err := h.service.GetTransactionsByProductID(input.ID, input.Limit, input.Offset)
 	if err != nil {
 		return nil, huma.Error404NotFound(err.Error())
